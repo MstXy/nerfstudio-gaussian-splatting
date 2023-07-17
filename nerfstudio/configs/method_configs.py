@@ -391,11 +391,11 @@ method_configs["vanilla-nerf"] = TrainerConfig(
     optimizers={
         "fields": {
             "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
-            "scheduler": None,
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.00001, max_steps=1000000),
         },
         "temporal_distortion": {
             "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
-            "scheduler": None,
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.00001, max_steps=1000000),
         },
     },
 )
