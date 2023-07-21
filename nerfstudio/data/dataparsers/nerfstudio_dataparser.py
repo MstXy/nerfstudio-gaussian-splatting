@@ -97,6 +97,8 @@ class Nerfstudio(DataParser):
             if distort_key in meta:
                 distort_fixed = True
                 break
+        camera_type_fixed = distort_fixed
+
         fx = []
         fy = []
         cx = []
@@ -104,6 +106,7 @@ class Nerfstudio(DataParser):
         height = []
         width = []
         distort = []
+        camera_type = []
 
         for frame in meta["frames"]:
             filepath = Path(frame["file_path"])
@@ -138,6 +141,11 @@ class Nerfstudio(DataParser):
                         p2=float(frame["p2"]) if "p2" in frame else 0.0,
                     )
                 )
+            if not camera_type_fixed:
+                if "camera_model" in frame:
+                    camera_type.append(CAMERA_MODEL_TO_TYPE[frame["camera_model"]])
+                else:
+                    camera_type.append(CameraType.PERSPECTIVE)
 
             image_filenames.append(fname)
             poses.append(np.array(frame["transform_matrix"]))
@@ -156,13 +164,13 @@ class Nerfstudio(DataParser):
                 depth_filenames.append(depth_fname)
 
         assert len(mask_filenames) == 0 or (
-            len(mask_filenames) == len(image_filenames)
+                len(mask_filenames) == len(image_filenames)
         ), """
         Different number of image and mask filenames.
         You should check that mask_path is specified for every frame (or zero frames) in transforms.json.
         """
         assert len(depth_filenames) == 0 or (
-            len(depth_filenames) == len(image_filenames)
+                len(depth_filenames) == len(image_filenames)
         ), """
         Different number of image and depth filenames.
         You should check that depth_file_path is specified for every frame (or zero frames) in transforms.json.
@@ -237,10 +245,13 @@ class Nerfstudio(DataParser):
             )
         )
 
-        if "camera_model" in meta:
-            camera_type = CAMERA_MODEL_TO_TYPE[meta["camera_model"]]
+        if camera_type_fixed:
+            if "camera_model" in meta:
+                camera_type = CAMERA_MODEL_TO_TYPE[meta["camera_model"]]
+            else:
+                camera_type = CameraType.PERSPECTIVE
         else:
-            camera_type = CameraType.PERSPECTIVE
+            camera_type = [camera_type[i] for i in indices]
 
         fx = float(meta["fl_x"]) if fx_fixed else torch.tensor(fx, dtype=torch.float32)[idx_tensor]
         fy = float(meta["fl_y"]) if fy_fixed else torch.tensor(fy, dtype=torch.float32)[idx_tensor]
@@ -316,11 +327,11 @@ class Nerfstudio(DataParser):
                 while True:
                     if (max_res / 2 ** (df)) < MAX_AUTO_RESOLUTION:
                         break
-                    if not (data_dir / f"{downsample_folder_prefix}{2**(df+1)}" / filepath.name).exists():
+                    if not (data_dir / f"{downsample_folder_prefix}{2 ** (df + 1)}" / filepath.name).exists():
                         break
                     df += 1
 
-                self.downscale_factor = 2**df
+                self.downscale_factor = 2 ** df
                 CONSOLE.log(f"Auto image downscale factor of {self.downscale_factor}")
             else:
                 self.downscale_factor = self.config.downscale_factor
