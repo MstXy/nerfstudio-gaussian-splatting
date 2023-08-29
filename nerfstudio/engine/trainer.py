@@ -119,7 +119,7 @@ class Trainer:
             self.device += f":{local_rank}"
         self.mixed_precision: bool = self.config.mixed_precision
         self.use_grad_scaler: bool = self.mixed_precision or self.config.use_grad_scaler
-        self.training_state: Literal["training", "paused", "completed"] = "training"
+        self.training_state: Literal["training", "paused", "completed"] = "paused"
         self.gradient_accumulation_steps: int = self.config.gradient_accumulation_steps
 
         if self.device == "cpu":

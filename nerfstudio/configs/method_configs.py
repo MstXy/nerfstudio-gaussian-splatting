@@ -30,17 +30,21 @@ from nerfstudio.configs.external_methods import get_external_methods
 
 from nerfstudio.data.datamanagers.random_cameras_datamanager import RandomCamerasDataManagerConfig
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager, VanillaDataManagerConfig
+from nerfstudio.data.datamanagers.gaussian_splatting_datamanager import GaussianSplattingDatamanager, \
+    GaussianSplattingDatamanagerConfig
 
 from nerfstudio.data.dataparsers.blender_dataparser import BlenderDataParserConfig
 from nerfstudio.data.dataparsers.dnerf_dataparser import DNeRFDataParserConfig
 from nerfstudio.data.dataparsers.instant_ngp_dataparser import InstantNGPDataParserConfig
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
+from nerfstudio.data.dataparsers.gaussian_splatting_dataparser import GaussianSplattingDataParserConfig
 from nerfstudio.data.dataparsers.phototourism_dataparser import PhototourismDataParserConfig
 from nerfstudio.data.dataparsers.sdfstudio_dataparser import SDFStudioDataParserConfig
 from nerfstudio.data.dataparsers.sitcoms3d_dataparser import Sitcoms3DDataParserConfig
 from nerfstudio.data.datasets.depth_dataset import DepthDataset
 from nerfstudio.data.datasets.sdf_dataset import SDFDataset
 from nerfstudio.data.datasets.semantic_dataset import SemanticDataset
+from nerfstudio.data.datasets.gaussian_splatting_dataset import GaussianSplattingDataset
 from nerfstudio.engine.optimizers import AdamOptimizerConfig, RAdamOptimizerConfig
 from nerfstudio.engine.schedulers import (
     CosineDecaySchedulerConfig,
@@ -53,6 +57,7 @@ from nerfstudio.fields.sdf_field import SDFFieldConfig
 from nerfstudio.models.depth_nerfacto import DepthNerfactoModelConfig
 from nerfstudio.models.generfacto import GenerfactoModelConfig
 from nerfstudio.models.instant_ngp import InstantNGPModelConfig
+from nerfstudio.models.gaussian_splatting import GaussianSplattingModelConfig
 from nerfstudio.models.mipnerf import MipNerfModel
 from nerfstudio.models.nerfacto import NerfactoModelConfig
 from nerfstudio.models.neus import NeuSModelConfig
@@ -61,11 +66,13 @@ from nerfstudio.models.semantic_nerfw import SemanticNerfWModelConfig
 from nerfstudio.models.tensorf import TensoRFModelConfig
 from nerfstudio.models.vanilla_nerf import NeRFModel, VanillaModelConfig
 from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
+from nerfstudio.pipelines.gaussian_splatting_pipeline import GaussianSplattingPipelineConfig
 from nerfstudio.pipelines.dynamic_batch import DynamicBatchPipelineConfig
 from nerfstudio.plugins.registry import discover_methods
 
 method_configs: Dict[str, TrainerConfig] = {}
 descriptions = {
+    "gs": "3D Gaussian Splatting",
     "nerfacto": "Recommended real-time model tuned for real captures. This model will be continually updated.",
     "depth-nerfacto": "Nerfacto with depth supervision.",
     "instant-ngp": "Implementation of Instant-NGP. Recommended real-time model for unbounded scenes.",
@@ -81,6 +88,20 @@ descriptions = {
     "neus-facto": "Implementation of NeuS-Facto. (slow)",
 }
 
+method_configs["gs"] = TrainerConfig(
+    method_name="gaussian_splatting",
+    steps_per_eval_batch=500,
+    steps_per_save=2000,
+    max_num_iterations=30000,
+    mixed_precision=True,
+    pipeline=GaussianSplattingPipelineConfig(
+        datamanager=GaussianSplattingDatamanagerConfig(),
+        model=GaussianSplattingModelConfig(),
+    ),
+    optimizers={},
+    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+    vis="viewer",
+)
 method_configs["nerfacto"] = TrainerConfig(
     method_name="nerfacto",
     steps_per_eval_batch=500,
@@ -258,7 +279,6 @@ method_configs["instant-ngp"] = TrainerConfig(
     vis="viewer",
 )
 
-
 method_configs["instant-ngp-bounded"] = TrainerConfig(
     method_name="instant-ngp-bounded",
     steps_per_eval_batch=500,
@@ -286,7 +306,6 @@ method_configs["instant-ngp-bounded"] = TrainerConfig(
     viewer=ViewerConfig(num_rays_per_chunk=1 << 12),
     vis="viewer",
 )
-
 
 method_configs["mipnerf"] = TrainerConfig(
     method_name="mipnerf",

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
+import numpy as np
 import cv2
 import torch
 import torchvision
@@ -34,6 +35,8 @@ from nerfstudio.cameras import camera_utils
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.utils.tensor_dataclass import TensorDataclass
+from nerfstudio.cameras.gaussian_splatting_camera import Camera as GaussianSplattingCamera
+from nerfstudio.utils.gaussian_splatting_graphics_utils import getWorld2View2, focal2fov, fov2focal
 
 TORCH_DEVICE = Union[torch.device, str]
 
@@ -99,23 +102,23 @@ class Cameras(TensorDataclass):
     metadata: Optional[Dict]
 
     def __init__(
-        self,
-        camera_to_worlds: Float[Tensor, "*batch_c2ws 3 4"],
-        fx: Union[Float[Tensor, "*batch_fxs 1"], float],
-        fy: Union[Float[Tensor, "*batch_fys 1"], float],
-        cx: Union[Float[Tensor, "*batch_cxs 1"], float],
-        cy: Union[Float[Tensor, "*batch_cys 1"], float],
-        width: Optional[Union[Shaped[Tensor, "*batch_ws 1"], int]] = None,
-        height: Optional[Union[Shaped[Tensor, "*batch_hs 1"], int]] = None,
-        distortion_params: Optional[Float[Tensor, "*batch_dist_params 6"]] = None,
-        camera_type: Union[
-            Int[Tensor, "*batch_cam_types 1"],
-            int,
-            List[CameraType],
-            CameraType,
-        ] = CameraType.PERSPECTIVE,
-        times: Optional[Float[Tensor, "num_cameras"]] = None,
-        metadata: Optional[Dict] = None,
+            self,
+            camera_to_worlds: Float[Tensor, "*batch_c2ws 3 4"],
+            fx: Union[Float[Tensor, "*batch_fxs 1"], float],
+            fy: Union[Float[Tensor, "*batch_fys 1"], float],
+            cx: Union[Float[Tensor, "*batch_cxs 1"], float],
+            cy: Union[Float[Tensor, "*batch_cys 1"], float],
+            width: Optional[Union[Shaped[Tensor, "*batch_ws 1"], int]] = None,
+            height: Optional[Union[Shaped[Tensor, "*batch_hs 1"], int]] = None,
+            distortion_params: Optional[Float[Tensor, "*batch_dist_params 6"]] = None,
+            camera_type: Union[
+                Int[Tensor, "*batch_cam_types 1"],
+                int,
+                List[CameraType],
+                CameraType,
+            ] = CameraType.PERSPECTIVE,
+            times: Optional[Float[Tensor, "num_cameras"]] = None,
+            metadata: Optional[Dict] = None,
     ) -> None:
         """Initializes the Cameras object.
 
@@ -177,10 +180,10 @@ class Cameras(TensorDataclass):
         return fc_xy
 
     def _init_get_camera_type(
-        self,
-        camera_type: Union[
-            Int[Tensor, "*batch_cam_types 1"], Int[Tensor, "*batch_cam_types"], int, List[CameraType], CameraType
-        ],
+            self,
+            camera_type: Union[
+                Int[Tensor, "*batch_cam_types 1"], Int[Tensor, "*batch_cam_types"], int, List[CameraType], CameraType
+            ],
     ) -> Int[Tensor, "*num_cameras 1"]:
         """
         Parses the __init__() argument camera_type
@@ -219,9 +222,9 @@ class Cameras(TensorDataclass):
         return camera_type
 
     def _init_get_height_width(
-        self,
-        h_w: Union[Shaped[Tensor, "*batch_hws 1"], Shaped[Tensor, "*batch_hws"], int, None],
-        c_x_y: Shaped[Tensor, "*batch_cxys"],
+            self,
+            h_w: Union[Shaped[Tensor, "*batch_hws 1"], Shaped[Tensor, "*batch_hws"], int, None],
+            c_x_y: Shaped[Tensor, "*batch_cxys"],
     ) -> Shaped[Tensor, "*num_cameras 1"]:
         """
         Parses the __init__() argument for height or width
@@ -287,7 +290,7 @@ class Cameras(TensorDataclass):
         return h_jagged or w_jagged
 
     def get_image_coords(
-        self, pixel_offset: float = 0.5, index: Optional[Tuple] = None
+            self, pixel_offset: float = 0.5, index: Optional[Tuple] = None
     ) -> Float[Tensor, "height width 2"]:
         """This gets the image coordinates of one of the cameras in this object.
 
@@ -315,14 +318,14 @@ class Cameras(TensorDataclass):
         return image_coords
 
     def generate_rays(
-        self,
-        camera_indices: Union[Int[Tensor, "*num_rays num_cameras_batch_dims"], int],
-        coords: Optional[Float[Tensor, "*num_rays 2"]] = None,
-        camera_opt_to_camera: Optional[Float[Tensor, "*num_rays 3 4"]] = None,
-        distortion_params_delta: Optional[Float[Tensor, "*num_rays 6"]] = None,
-        keep_shape: Optional[bool] = None,
-        disable_distortion: bool = False,
-        aabb_box: Optional[SceneBox] = None,
+            self,
+            camera_indices: Union[Int[Tensor, "*num_rays num_cameras_batch_dims"], int],
+            coords: Optional[Float[Tensor, "*num_rays 2"]] = None,
+            camera_opt_to_camera: Optional[Float[Tensor, "*num_rays 3 4"]] = None,
+            distortion_params_delta: Optional[Float[Tensor, "*num_rays 6"]] = None,
+            keep_shape: Optional[bool] = None,
+            disable_distortion: bool = False,
+            aabb_box: Optional[SceneBox] = None,
     ) -> RayBundle:
         """Generates rays for the given camera indices.
 
@@ -394,7 +397,7 @@ class Cameras(TensorDataclass):
         # If the camera indices are an int, then we need to make sure that the camera batch is 1D
         if isinstance(camera_indices, int):
             assert (
-                len(cameras.shape) == 1
+                    len(cameras.shape) == 1
             ), "camera_indices must be a tensor if cameras are batched with more than 1 batch dimension"
             camera_indices = torch.tensor([camera_indices], device=cameras.device)
 
@@ -486,18 +489,41 @@ class Cameras(TensorDataclass):
                 raybundle.nears = t_min
                 raybundle.fars = t_max
 
+        c2w = torch.clone(self.camera_to_worlds[0])
+        c2w = torch.concatenate([c2w, torch.tensor([[0, 0, 0, 1]], device=self.camera_to_worlds.device)], dim=0)
+        # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
+        c2w[:3, 1:3] *= -1
+
+        # get the world-to-camera transform and set R, T
+        w2c = np.linalg.inv(c2w.cpu().numpy())
+        R = np.transpose(w2c[:3, :3])  # R is stored transposed due to 'glm' in CUDA code
+        T = w2c[:3, 3]
+
+        FovY = focal2fov(self.fy, self.height)
+        FovX = focal2fov(self.fx, self.width)
+
+        raybundle.gs_camera = GaussianSplattingCamera(
+            R=R,
+            T=T,
+            width=self.width,
+            height=self.height,
+            FoVx=FovX,
+            FoVy=FovY,
+            data_device=self.camera_to_worlds.device,
+        )
+
         # TODO: We should have to squeeze the last dimension here if we started with zero batch dims, but never have to,
         # so there might be a rogue squeeze happening somewhere, and this may cause some unintended behaviour
         # that we haven't caught yet with tests
         return raybundle
 
     def _generate_rays_from_coords(
-        self,
-        camera_indices: Int[Tensor, "*num_rays num_cameras_batch_dims"],
-        coords: Float[Tensor, "*num_rays 2"],
-        camera_opt_to_camera: Optional[Float[Tensor, "*num_rays 3 4"]] = None,
-        distortion_params_delta: Optional[Float[Tensor, "*num_rays 6"]] = None,
-        disable_distortion: bool = False,
+            self,
+            camera_indices: Int[Tensor, "*num_rays num_cameras_batch_dims"],
+            coords: Float[Tensor, "*num_rays 2"],
+            camera_opt_to_camera: Optional[Float[Tensor, "*num_rays 3 4"]] = None,
+            distortion_params_delta: Optional[Float[Tensor, "*num_rays 6"]] = None,
+            disable_distortion: bool = False,
     ) -> RayBundle:
         """Generates rays for the given camera indices and coords where self isn't jagged
 
@@ -590,20 +616,20 @@ class Cameras(TensorDataclass):
         fx, fy = self.fx[true_indices].squeeze(-1), self.fy[true_indices].squeeze(-1)  # (num_rays,)
         cx, cy = self.cx[true_indices].squeeze(-1), self.cy[true_indices].squeeze(-1)  # (num_rays,)
         assert (
-            y.shape == num_rays_shape
-            and x.shape == num_rays_shape
-            and fx.shape == num_rays_shape
-            and fy.shape == num_rays_shape
-            and cx.shape == num_rays_shape
-            and cy.shape == num_rays_shape
+                y.shape == num_rays_shape
+                and x.shape == num_rays_shape
+                and fx.shape == num_rays_shape
+                and fy.shape == num_rays_shape
+                and cx.shape == num_rays_shape
+                and cy.shape == num_rays_shape
         ), (
-            str(num_rays_shape)
-            + str(y.shape)
-            + str(x.shape)
-            + str(fx.shape)
-            + str(fy.shape)
-            + str(cx.shape)
-            + str(cy.shape)
+                str(num_rays_shape)
+                + str(y.shape)
+                + str(x.shape)
+                + str(fx.shape)
+                + str(fy.shape)
+                + str(cx.shape)
+                + str(cy.shape)
         )
 
         # Get our image coordinates and image coordinates offset by 1 (offsets used for dx, dy calculations)
@@ -612,9 +638,9 @@ class Cameras(TensorDataclass):
         coord_x_offset = torch.stack([(x - cx + 1) / fx, -(y - cy) / fy], -1)  # (num_rays, 2)
         coord_y_offset = torch.stack([(x - cx) / fx, -(y - cy + 1) / fy], -1)  # (num_rays, 2)
         assert (
-            coord.shape == num_rays_shape + (2,)
-            and coord_x_offset.shape == num_rays_shape + (2,)
-            and coord_y_offset.shape == num_rays_shape + (2,)
+                coord.shape == num_rays_shape + (2,)
+                and coord_x_offset.shape == num_rays_shape + (2,)
+                and coord_y_offset.shape == num_rays_shape + (2,)
         )
 
         # Stack image coordinates and image coordinates offset by 1, check shapes too
@@ -656,7 +682,7 @@ class Cameras(TensorDataclass):
         assert c2w.shape == num_rays_shape + (3, 4)
 
         def _compute_rays_for_omnidirectional_stereo(
-            eye: Literal["left", "right"]
+                eye: Literal["left", "right"]
         ) -> Tuple[Float[Tensor, "num_rays_shape 3"], Float[Tensor, "3 num_rays_shape 3"]]:
             """Compute the rays for an omnidirectional stereo camera
 
@@ -698,8 +724,9 @@ class Cameras(TensorDataclass):
 
             # circle of ODS ray origins
             ods_origins_circle = (
-                isRightEye * (vr_ipd / 2.0) * (ods_x_axis.repeat(c2w.shape[1], 1)) * (torch.cos(ods_theta))[:, None]
-                + isRightEye * (vr_ipd / 2.0) * (ods_z_axis.repeat(c2w.shape[1], 1)) * (torch.sin(ods_theta))[:, None]
+                    isRightEye * (vr_ipd / 2.0) * (ods_x_axis.repeat(c2w.shape[1], 1)) * (torch.cos(ods_theta))[:, None]
+                    + isRightEye * (vr_ipd / 2.0) * (ods_z_axis.repeat(c2w.shape[1], 1)) * (torch.sin(ods_theta))[:,
+                                                                                           None]
             )
 
             # rotate origins to match the camera rotation
@@ -713,7 +740,7 @@ class Cameras(TensorDataclass):
             return ods_origins_circle, directions_stack
 
         def _compute_rays_for_vr180(
-            eye: Literal["left", "right"]
+                eye: Literal["left", "right"]
         ) -> Tuple[Float[Tensor, "num_rays_shape 3"], Float[Tensor, "3 num_rays_shape 3"]]:
             """Compute the rays for a VR180 camera
 
@@ -778,7 +805,7 @@ class Cameras(TensorDataclass):
                 mask = (self.camera_type[true_indices] == CameraType.FISHEYE.value).squeeze(-1)  # (num_rays)
                 mask = torch.stack([mask, mask, mask], dim=0)
 
-                theta = torch.sqrt(torch.sum(coord_stack**2, dim=-1))
+                theta = torch.sqrt(torch.sum(coord_stack ** 2, dim=-1))
                 theta = torch.clip(theta, 0.0, math.pi)
 
                 sin_theta = torch.sin(theta)
@@ -876,7 +903,8 @@ class Cameras(TensorDataclass):
         )
 
     def to_json(
-        self, camera_idx: int, image: Optional[Float[Tensor, "height width 2"]] = None, max_size: Optional[int] = None
+            self, camera_idx: int, image: Optional[Float[Tensor, "height width 2"]] = None,
+            max_size: Optional[int] = None
     ) -> Dict:
         """Convert a camera to a json dictionary.
 
@@ -906,7 +934,8 @@ class Cameras(TensorDataclass):
             image_uint8 = (image * 255).detach().type(torch.uint8)
             if max_size is not None:
                 image_uint8 = image_uint8.permute(2, 0, 1)
-                image_uint8 = torchvision.transforms.functional.resize(image_uint8, max_size, antialias=None)  # type: ignore
+                image_uint8 = torchvision.transforms.functional.resize(image_uint8, max_size,
+                                                                       antialias=None)  # type: ignore
                 image_uint8 = image_uint8.permute(1, 2, 0)
             image_uint8 = image_uint8.cpu().numpy()
             data = cv2.imencode(".jpg", image_uint8)[1].tobytes()  # type: ignore
@@ -928,7 +957,7 @@ class Cameras(TensorDataclass):
         return K
 
     def rescale_output_resolution(
-        self, scaling_factor: Union[Shaped[Tensor, "*num_cameras"], Shaped[Tensor, "*num_cameras 1"], float, int]
+            self, scaling_factor: Union[Shaped[Tensor, "*num_cameras"], Shaped[Tensor, "*num_cameras 1"], float, int]
     ) -> None:
         """Rescale the output resolution of the cameras.
 

@@ -152,20 +152,20 @@ class RaySamples(TensorDataclass):
     @overload
     @staticmethod
     def get_weights_and_transmittance_from_alphas(
-        alphas: Float[Tensor, "*batch num_samples 1"], weights_only: Literal[True]
+            alphas: Float[Tensor, "*batch num_samples 1"], weights_only: Literal[True]
     ) -> Float[Tensor, "*batch num_samples 1"]:
         ...
 
     @overload
     @staticmethod
     def get_weights_and_transmittance_from_alphas(
-        alphas: Float[Tensor, "*batch num_samples 1"], weights_only: Literal[False] = False
+            alphas: Float[Tensor, "*batch num_samples 1"], weights_only: Literal[False] = False
     ) -> Tuple[Float[Tensor, "*batch num_samples 1"], Float[Tensor, "*batch num_samples 1"]]:
         ...
 
     @staticmethod
     def get_weights_and_transmittance_from_alphas(
-        alphas: Float[Tensor, "*batch num_samples 1"], weights_only: bool = False
+            alphas: Float[Tensor, "*batch num_samples 1"], weights_only: bool = False
     ) -> Union[
         Float[Tensor, "*batch num_samples 1"],
         Tuple[Float[Tensor, "*batch num_samples 1"], Float[Tensor, "*batch num_samples 1"]],
@@ -210,6 +210,8 @@ class RayBundle(TensorDataclass):
     times: Optional[Float[Tensor, "*batch 1"]] = None
     """Times at which rays are sampled"""
 
+    gs_camera = None
+
     def set_camera_indices(self, camera_index: int) -> None:
         """Sets all the camera indices to a specific camera index.
 
@@ -249,12 +251,12 @@ class RayBundle(TensorDataclass):
         return self.flatten()[start_idx:end_idx]
 
     def get_ray_samples(
-        self,
-        bin_starts: Float[Tensor, "*bs num_samples 1"],
-        bin_ends: Float[Tensor, "*bs num_samples 1"],
-        spacing_starts: Optional[Float[Tensor, "*bs num_samples 1"]] = None,
-        spacing_ends: Optional[Float[Tensor, "*bs num_samples 1"]] = None,
-        spacing_to_euclidean_fn: Optional[Callable] = None,
+            self,
+            bin_starts: Float[Tensor, "*bs num_samples 1"],
+            bin_ends: Float[Tensor, "*bs num_samples 1"],
+            spacing_starts: Optional[Float[Tensor, "*bs num_samples 1"]] = None,
+            spacing_ends: Optional[Float[Tensor, "*bs num_samples 1"]] = None,
+            spacing_to_euclidean_fn: Optional[Callable] = None,
     ) -> RaySamples:
         """Produces samples for each ray by projection points along the ray direction. Currently samples uniformly.
 
