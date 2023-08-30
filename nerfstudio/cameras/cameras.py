@@ -35,8 +35,6 @@ from nerfstudio.cameras import camera_utils
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.utils.tensor_dataclass import TensorDataclass
-from nerfstudio.cameras.gaussian_splatting_camera import Camera as GaussianSplattingCamera
-from nerfstudio.utils.gaussian_splatting_graphics_utils import getWorld2View2, focal2fov, fov2focal
 
 TORCH_DEVICE = Union[torch.device, str]
 
@@ -373,6 +371,8 @@ class Cameras(TensorDataclass):
         Returns:
             Rays for the given camera indices and coords.
         """
+        selected_camera = self[camera_indices]
+
         # Check the argument types to make sure they're valid and all shaped correctly
         assert isinstance(camera_indices, (torch.Tensor, int)), "camera_indices must be a tensor or int"
         assert coords is None or isinstance(coords, torch.Tensor), "coords must be a tensor or None"
@@ -489,28 +489,7 @@ class Cameras(TensorDataclass):
                 raybundle.nears = t_min
                 raybundle.fars = t_max
 
-        c2w = torch.clone(self.camera_to_worlds[0])
-        c2w = torch.concatenate([c2w, torch.tensor([[0, 0, 0, 1]], device=self.camera_to_worlds.device)], dim=0)
-        # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
-        c2w[:3, 1:3] *= -1
-
-        # get the world-to-camera transform and set R, T
-        w2c = np.linalg.inv(c2w.cpu().numpy())
-        R = np.transpose(w2c[:3, :3])  # R is stored transposed due to 'glm' in CUDA code
-        T = w2c[:3, 3]
-
-        FovY = focal2fov(self.fy, self.height)
-        FovX = focal2fov(self.fx, self.width)
-
-        raybundle.gs_camera = GaussianSplattingCamera(
-            R=R,
-            T=T,
-            width=self.width,
-            height=self.height,
-            FoVx=FovX,
-            FoVy=FovY,
-            data_device=self.camera_to_worlds.device,
-        )
+        raybundle.camera = selected_camera
 
         # TODO: We should have to squeeze the last dimension here if we started with zero batch dims, but never have to,
         # so there might be a rogue squeeze happening somewhere, and this may cause some unintended behaviour

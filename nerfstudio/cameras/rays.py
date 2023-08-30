@@ -210,7 +210,7 @@ class RayBundle(TensorDataclass):
     times: Optional[Float[Tensor, "*batch 1"]] = None
     """Times at which rays are sampled"""
 
-    gs_camera = None
+    camera = None
 
     def set_camera_indices(self, camera_index: int) -> None:
         """Sets all the camera indices to a specific camera index.

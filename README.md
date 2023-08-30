@@ -1,7 +1,34 @@
 # License
 The codes originated from NeRFStudio are licensed under the Apache-2.0 license. 
 
-The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) ([License](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/main/LICENSE.md)), [submodules/simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn.git), some codes and files copied from [graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) ([License](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/LICENSE.md)) that used to implement gaussian splatting viewer here are separately licensed.
+The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) ([License](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/main/LICENSE.md)), [submodules/simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn.git), some codes and files copied from [graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) ([License](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/LICENSE.md)) that used to implement gaussian splatting here are separately licensed.
+
+# Gaussian Splatting Viewer & Render
+## NOTE
+ * Not well tested
+ * Rendering only (no training)
+## Installation
+ 1. Install nerfstudio dependencies
+ 2. 
+```bash
+pip install plyfile==0.8.1
+pip install ./submodules/diff-gaussian-rasterization
+pip install ./submodules/simple-knn
+```
+## Usage
+### Viewer: 
+```bash
+python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model-path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR
+```
+You can click `RESET UP DIRECTION` under the "SCENE" tab to reorient the world.
+
+### Render:
+```bash
+python nerfstudio/scripts/gaussian_splatting/render.py camera-path \
+    --model-path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR \
+    --camera-path-filename YOUR_CAMERA_PATH_FILE.json \
+    --output-path YOUR_OUTPUT_MP4_FILE.mp4
+```
 
 <hr>
 <p align="center">

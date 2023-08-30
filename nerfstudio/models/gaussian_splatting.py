@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import math
 import torchvision
@@ -12,6 +13,8 @@ from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.fields.gaussian_splatting_field import GaussianSplattingField
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from nerfstudio.utils.gaussian_splatting_sh_utils import eval_sh
+from nerfstudio.cameras.gaussian_splatting_camera import Camera as GaussianSplattingCamera
+from nerfstudio.utils.gaussian_splatting_graphics_utils import getWorld2View2, focal2fov, fov2focal
 
 
 @dataclass
@@ -79,7 +82,7 @@ class GaussianSplatting(Model):
 
     @torch.no_grad()
     def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
-        viewpoint_camera = camera_ray_bundle.gs_camera
+        viewpoint_camera = self.ns2gs_camera(camera_ray_bundle.camera)
 
         background = torch.tensor(self.bg_color, dtype=torch.float32, device=camera_ray_bundle.origins.device)
 
@@ -95,6 +98,32 @@ class GaussianSplatting(Model):
         return {
             "rgb": rgb,
         }
+
+    @staticmethod
+    def ns2gs_camera(ns_camera):
+        c2w = torch.clone(ns_camera.camera_to_worlds)
+        c2w = torch.concatenate([c2w, torch.tensor([[0, 0, 0, 1]], device=ns_camera.camera_to_worlds.device)], dim=0)
+        # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
+        c2w[:3, 1:3] *= -1
+
+        # get the world-to-camera transform and set R, T
+        w2c = np.linalg.inv(c2w.cpu().numpy())
+        R = np.transpose(w2c[:3, :3])  # R is stored transposed due to 'glm' in CUDA code
+        T = w2c[:3, 3]
+
+        FovY = focal2fov(ns_camera.fy, ns_camera.height)
+        FovX = focal2fov(ns_camera.fx, ns_camera.width)
+
+        return GaussianSplattingCamera(
+            R=R,
+            T=T,
+            width=ns_camera.width,
+            height=ns_camera.height,
+            FoVx=FovX,
+            FoVy=FovY,
+            data_device=ns_camera.camera_to_worlds.device,
+        )
+
 
     @staticmethod
     def render(viewpoint_camera, pc, pipe, bg_color: torch.Tensor, scaling_modifier=1.0, override_color=None):
