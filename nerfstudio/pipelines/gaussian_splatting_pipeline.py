@@ -47,6 +47,7 @@ class GaussianSplattingPipeline(Pipeline):
             device: str,
             model_path: str = None,
             load_iteration: int = -1,
+            ref_orientation: str = None
     ):
         super().__init__()
 
@@ -56,6 +57,7 @@ class GaussianSplattingPipeline(Pipeline):
             num_train_data=len(self.datamanager.train_dataset),
             model_path=model_path,
             load_iteration=load_iteration,
+            ref_orientation=ref_orientation,
         )
         self.model.to(device)
 

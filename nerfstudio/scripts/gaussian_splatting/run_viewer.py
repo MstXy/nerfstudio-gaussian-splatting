@@ -44,6 +44,8 @@ class RunViewer(GaussianSplattingConfig):
 
     load_iteration: int = -1
 
+    ref_orientation: str = None
+
     def main(self) -> None:
         """Main function."""
         device_str = "cuda"
@@ -52,6 +54,7 @@ class RunViewer(GaussianSplattingConfig):
             device=device_str,
             model_path=self.model_path,
             load_iteration=self.load_iteration,
+            ref_orientation=self.ref_orientation,
         )
         config = self.config
         config.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")

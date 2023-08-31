@@ -326,6 +326,8 @@ class BaseRender:
 
     load_iteration: int = -1
 
+    ref_orientation: str = None
+
     config: Type = GaussianSplattingConfig().config
 
     output_path: Path = Path("renders/output.mp4")
@@ -363,6 +365,7 @@ class RenderCameraPath(BaseRender):
             device="cuda",
             model_path=str(self.model_path),
             load_iteration=self.load_iteration,
+            ref_orientation=self.ref_orientation,
         )
 
         install_checks.check_ffmpeg_installed()
@@ -511,6 +514,7 @@ class RenderInterpolated(BaseRender):
             device="cuda",
             model_path=str(self.model_path),
             load_iteration=self.load_iteration,
+            ref_orientation=self.ref_orientation,
         )
 
         install_checks.check_ffmpeg_installed()
@@ -563,6 +567,7 @@ class SpiralRender(BaseRender):
             device="cuda",
             model_path=str(self.model_path),
             load_iteration=self.load_iteration,
+            ref_orientation=self.ref_orientation,
         )
 
         install_checks.check_ffmpeg_installed()
