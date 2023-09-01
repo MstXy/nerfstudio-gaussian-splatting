@@ -5,8 +5,13 @@ The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/
 
 # Gaussian Splatting Viewer & Render
 ## NOTE
- * Not well tested
- * Rendering only (no training)
+ * Not well tested, rendering only (no training), not as fast as SIBR viewers
+ * The render quality of the nerfstudio web viewer could be the same as the SIBR viewers. You need to
+ 	* increase the render resolution (the `Max Res` option under the `CONTROLS` tab)
+  	* increase jpeg quality (`--config.viewer.jpeg-quality 100`) or switch to png format (`--config.viewer.image-format png`)
+ * The default orientation may not correct, you can
+	* click `RESET UP DIRECTION` under the "SCENE" tab to use your current viewpoint as the orientation
+ 	* use `--ref-orientation IMAGE_NAME` option to specific an image as the reference orientation
 ## Installation
  1. Install nerfstudio dependencies
  2. 
@@ -20,7 +25,6 @@ pip install ./submodules/simple-knn
 ```bash
 python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model-path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR
 ```
-You can click `RESET UP DIRECTION` under the "SCENE" tab to reorient the world.
 
 ### Render:
 ```bash
