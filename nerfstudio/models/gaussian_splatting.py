@@ -54,14 +54,14 @@ class GaussianSplatting(Model):
             num_train_data: int,
             model_path: str = None,
             load_iteration: int = -1,
-            ref_orientation: str = None,
+            orientation_transform: torch.Tensor = None,
             appearance_name: str = None,
             appearance_values: tuple = None,
     ) -> None:
         self.config = config
         self.model_path = model_path
         self.load_iteration = load_iteration
-        self.ref_orientation = ref_orientation
+        self.orientation_transform = orientation_transform
         self.appearance_name = appearance_name
         self.appearance_values = appearance_values
         self.pipeline_params = PipelineParams()
@@ -73,10 +73,7 @@ class GaussianSplatting(Model):
         super().__init__(config, scene_box, num_train_data)
 
     def populate_modules(self):
-
         super().populate_modules()
-
-        self.orientation_transform = self.get_orientation_transform()
 
         # get iteration
         if self.load_iteration == -1:
@@ -136,45 +133,6 @@ class GaussianSplatting(Model):
                                                   "point_cloud",
                                                   "iteration_" + str(self.load_iteration),
                                                   "point_cloud.ply"))
-
-    def get_orientation_transform(self):
-        if self.ref_orientation is None:
-            return None
-
-        # load camera information
-        cameras_json_path = os.path.join(self.model_path, "cameras.json")
-        if os.path.exists(cameras_json_path) is False:
-            return None
-        with open(cameras_json_path, "r") as f:
-            cameras = json.load(f)
-
-        # find specific camera by image name
-        ref_camera = None
-        for i in cameras:
-            if i["img_name"] != self.ref_orientation:
-                continue
-            ref_camera = i
-            break
-        if ref_camera is None:
-            raise ValueError("camera {} not found".format(self.ref_orientation))
-
-        def rx(theta):
-            return np.matrix([
-                [1, 0, 0, 0],
-                [0, np.cos(theta), -np.sin(theta), 0],
-                [0, np.sin(theta), np.cos(theta), 0],
-                [0, 0, 0, 1]
-            ],
-            )
-
-        # get camera rotation
-        rotation = np.eye(4)
-        rotation[:3, :3] = np.asarray(ref_camera["rotation"])
-        rotation[:3, 1:3] *= -1
-
-        transform = np.matmul(rotation, rx(-np.pi / 2))
-
-        return torch.tensor(transform, dtype=torch.float)
 
     @staticmethod
     def search_for_max_iteration(folder):
