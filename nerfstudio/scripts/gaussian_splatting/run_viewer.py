@@ -23,7 +23,7 @@ import os
 import time
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union
 
 import tyro
 
@@ -40,22 +40,9 @@ from nerfstudio.scripts.gaussian_splatting.gaussian_splatting_config import Gaus
 
 @dataclass
 class RunViewer(GaussianSplattingConfig):
-    model_path: str = None
-
-    load_iteration: int = -1
-
-    ref_orientation: str = None
-
     def main(self) -> None:
         """Main function."""
-        device_str = "cuda"
-
-        pipeline = self.config.pipeline.setup(
-            device=device_str,
-            model_path=self.model_path,
-            load_iteration=self.load_iteration,
-            ref_orientation=self.ref_orientation,
-        )
+        pipeline = self.setup_pipeline()
         config = self.config
         config.timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
 

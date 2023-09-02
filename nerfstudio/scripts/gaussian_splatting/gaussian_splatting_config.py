@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from dataclasses import dataclass, field, fields
 
 from nerfstudio.configs.base_config import ViewerConfig
@@ -26,3 +28,28 @@ class GaussianSplattingConfig:
         viewer=ViewerConfig(),
         vis="viewer",
     )
+
+    model_path: str = None
+
+    load_iteration: int = -1
+
+    ref_orientation: str = None
+
+    appearance_name: str = None
+
+    appearance_values: Tuple[float, float, float, float] = (-1., -1., -1., -1.)
+
+    def get_pipeline_setup_arguments(self):
+        return {
+            "model_path": str(self.model_path),
+            "load_iteration": self.load_iteration,
+            "ref_orientation": self.ref_orientation,
+            "appearance_name": self.appearance_name,
+            "appearance_values": self.appearance_values,
+        }
+
+    def setup_pipeline(self):
+        return self.config.pipeline.setup(
+            device="cuda",
+            **self.get_pipeline_setup_arguments(),
+        )

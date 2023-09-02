@@ -1,3 +1,4 @@
+# !/usr/bin/env python
 # Copyright 2022 the Regents of the University of California, Nerfstudio Team and contributors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python
 """
 render.py
 """
@@ -66,19 +66,19 @@ from nerfstudio.scripts.gaussian_splatting.gaussian_splatting_config import Gaus
 
 
 def _render_trajectory_video(
-    pipeline: Pipeline,
-    cameras: Cameras,
-    output_filename: Path,
-    rendered_output_names: List[str],
-    crop_data: Optional[CropData] = None,
-    rendered_resolution_scaling_factor: float = 1.0,
-    seconds: float = 5.0,
-    output_format: Literal["images", "video"] = "video",
-    image_format: Literal["jpeg", "png"] = "jpeg",
-    jpeg_quality: int = 100,
-    depth_near_plane: Optional[float] = None,
-    depth_far_plane: Optional[float] = None,
-    colormap_options: colormaps.ColormapOptions = colormaps.ColormapOptions(),
+        pipeline: Pipeline,
+        cameras: Cameras,
+        output_filename: Path,
+        rendered_output_names: List[str],
+        crop_data: Optional[CropData] = None,
+        rendered_resolution_scaling_factor: float = 1.0,
+        seconds: float = 5.0,
+        output_format: Literal["images", "video"] = "video",
+        image_format: Literal["jpeg", "png"] = "jpeg",
+        jpeg_quality: int = 100,
+        depth_near_plane: Optional[float] = None,
+        depth_far_plane: Optional[float] = None,
+        colormap_options: colormaps.ColormapOptions = colormaps.ColormapOptions(),
 ) -> None:
     """Helper function to create a video of the spiral trajectory.
 
@@ -138,7 +138,7 @@ def _render_trajectory_video(
 
                 if crop_data is not None:
                     with renderers.background_color_override_context(
-                        crop_data.background_color.to(pipeline.device)
+                            crop_data.background_color.to(pipeline.device)
                     ), torch.no_grad():
                         outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
                 else:
@@ -216,7 +216,7 @@ def _render_trajectory_video(
 
 
 def insert_spherical_metadata_into_file(
-    output_filename: Path,
+        output_filename: Path,
 ) -> None:
     """Inserts spherical metadata into MP4 video file in-place.
     Args:
@@ -318,18 +318,8 @@ def get_crop_from_json(camera_json: Dict[str, Any]) -> Optional[CropData]:
 
 
 @dataclass
-class BaseRender:
+class BaseRender(GaussianSplattingConfig):
     """Base class for rendering."""
-
-    model_path: Path
-    """Path to gaussian splatting output model directory."""
-
-    load_iteration: int = -1
-
-    ref_orientation: str = None
-
-    config: Type = GaussianSplattingConfig().config
-
     output_path: Path = Path("renders/output.mp4")
     """Path to output video file."""
     image_format: Literal["jpeg", "png"] = "jpeg"
@@ -361,12 +351,7 @@ class RenderCameraPath(BaseRender):
 
     def main(self) -> None:
         """Main function."""
-        pipeline = self.config.pipeline.setup(
-            device="cuda",
-            model_path=str(self.model_path),
-            load_iteration=self.load_iteration,
-            ref_orientation=self.ref_orientation,
-        )
+        pipeline = self.setup_pipeline()
 
         install_checks.check_ffmpeg_installed()
 
@@ -377,8 +362,8 @@ class RenderCameraPath(BaseRender):
         camera_path = get_path_from_json(camera_path)
 
         if (
-            camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value
-            or camera_path.camera_type[0] == CameraType.VR180_L.value
+                camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value
+                or camera_path.camera_type[0] == CameraType.VR180_L.value
         ):
             # temp folder for writing left and right view renders
             temp_folder_path = self.output_path.parent / (self.output_path.stem + "_temp")
@@ -416,8 +401,8 @@ class RenderCameraPath(BaseRender):
         )
 
         if (
-            camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value
-            or camera_path.camera_type[0] == CameraType.VR180_L.value
+                camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value
+                or camera_path.camera_type[0] == CameraType.VR180_L.value
         ):
             # declare paths for left and right renders
 
@@ -461,9 +446,9 @@ class RenderCameraPath(BaseRender):
                     self.output_path = Path(str(left_eye_path.parent)[:-5])
                     self.output_path.mkdir(parents=True, exist_ok=True)
                     if self.image_format == "png":
-                        ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.png"}"'
+                        ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex vstack -start_number 0 "{str(self.output_path) + "//%05d.png"}"'
                     elif self.image_format == "jpeg":
-                        ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.jpg"}"'
+                        ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex vstack -start_number 0 "{str(self.output_path) + "//%05d.jpg"}"'
                     run_command(ffmpeg_ods_command, verbose=False)
 
                 # remove the temp files directory
@@ -482,9 +467,9 @@ class RenderCameraPath(BaseRender):
                     self.output_path = Path(str(left_eye_path.parent)[:-5])
                     self.output_path.mkdir(parents=True, exist_ok=True)
                     if self.image_format == "png":
-                        ffmpeg_vr180_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex hstack -start_number 0 "{str(self.output_path)+"//%05d.png"}"'
+                        ffmpeg_vr180_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex hstack -start_number 0 "{str(self.output_path) + "//%05d.png"}"'
                     elif self.image_format == "jpeg":
-                        ffmpeg_vr180_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex hstack -start_number 0 "{str(self.output_path)+"//%05d.jpg"}"'
+                        ffmpeg_vr180_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex hstack -start_number 0 "{str(self.output_path) + "//%05d.jpg"}"'
                     run_command(ffmpeg_vr180_command, verbose=False)
 
                 # remove the temp files directory
@@ -510,12 +495,7 @@ class RenderInterpolated(BaseRender):
 
     def main(self) -> None:
         """Main function."""
-        pipeline = self.config.pipeline.setup(
-            device="cuda",
-            model_path=str(self.model_path),
-            load_iteration=self.load_iteration,
-            ref_orientation=self.ref_orientation,
-        )
+        pipeline = self.setup_pipeline()
 
         install_checks.check_ffmpeg_installed()
 
@@ -563,12 +543,7 @@ class SpiralRender(BaseRender):
 
     def main(self) -> None:
         """Main function."""
-        pipeline = self.config.pipeline.setup(
-            device="cuda",
-            model_path=str(self.model_path),
-            load_iteration=self.load_iteration,
-            ref_orientation=self.ref_orientation,
-        )
+        pipeline = self.setup_pipeline()
 
         install_checks.check_ffmpeg_installed()
 

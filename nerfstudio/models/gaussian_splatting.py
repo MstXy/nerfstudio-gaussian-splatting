@@ -42,6 +42,9 @@ class GaussianSplatting(Model):
     load_iteration: int
     ref_orientation: str
     orientation_transform: torch.Tensor
+    appearance_name: str
+    appearance_values: tuple = None
+    appearance: Tuple[torch.Tensor, torch.Tensor]
     gaussian_model: GaussianSplattingField
 
     def __init__(
@@ -52,11 +55,15 @@ class GaussianSplatting(Model):
             model_path: str = None,
             load_iteration: int = -1,
             ref_orientation: str = None,
+            appearance_name: str = None,
+            appearance_values: tuple = None,
     ) -> None:
         self.config = config
         self.model_path = model_path
         self.load_iteration = load_iteration
         self.ref_orientation = ref_orientation
+        self.appearance_name = appearance_name
+        self.appearance_values = appearance_values
         self.pipeline_params = PipelineParams()
         if self.config.background_color == "black":
             self.bg_color = [0, 0, 0]
@@ -71,11 +78,59 @@ class GaussianSplatting(Model):
 
         self.orientation_transform = self.get_orientation_transform()
 
-        self.gaussian_model = GaussianSplattingField(sh_degree=self.config.sh_degree)
-
+        # get iteration
         if self.load_iteration == -1:
             self.load_iteration = self.search_for_max_iteration(os.path.join(self.model_path, "point_cloud"))
         print("Loading trained model at iteration {}".format(self.load_iteration))
+
+        # get appearance
+        if self.appearance_name is not None:
+            # load appearance model
+            appearance_model_checkpoint_path = os.path.join(
+                self.model_path,
+                "point_cloud",
+                "iteration_{}".format(self.load_iteration),
+                "appearance_embedding.ckpt",
+            )
+            appearance_checkpoint = torch.load(appearance_model_checkpoint_path)
+
+            from nerfstudio.field_components.gaussian_splatting_appearance import GaussianSplattingAppearanceModel
+            appearance_model = GaussianSplattingAppearanceModel(**appearance_checkpoint["model_config"])
+            appearance_model.load_state_dict(appearance_checkpoint["model_state_dict"])
+            appearance_model = appearance_model.to("cuda")
+
+            # get appearance input
+            normalized_appearance_embedding_path = os.path.join(self.model_path, "normalized_appearance_embedding.pt")
+            normalized_appearance_embedding = torch.load(normalized_appearance_embedding_path)
+            appearance_embedding = self.appearance_name
+            with torch.no_grad():
+                # map user input to normalized value
+                if appearance_embedding not in normalized_appearance_embedding_path:
+                    # the key may be int
+                    try:
+                        appearance_embedding = int(appearance_embedding)
+                    except:
+                        pass
+                normalized_appearance_embedding_value = normalized_appearance_embedding[appearance_embedding]
+
+                with torch.no_grad():
+                    self.appearance = appearance_model.get_appearance(normalized_appearance_embedding_value)
+                print("Use appearance embedding {} -> {} -> {}".format(
+                    appearance_embedding,
+                    normalized_appearance_embedding_value,
+                    torch.concat(self.appearance, dim=0).reshape((-1,)).cpu().numpy(),
+                ))
+        elif self.appearance_values[0] > 0:
+            print("Use direct appearance embedding values {}".format(self.appearance_values))
+            self.appearance = (
+                torch.tensor(self.appearance_values[:3], dtype=torch.float).reshape((-1, 1, 1)),
+                torch.tensor(self.appearance_values[3:], dtype=torch.float).reshape((-1, 1, 1)),
+            )
+        else:
+            self.appearance = None
+
+        # load gaussian model
+        self.gaussian_model = GaussianSplattingField(sh_degree=self.config.sh_degree)
 
         self.gaussian_model.load_ply(os.path.join(self.model_path,
                                                   "point_cloud",
@@ -139,8 +194,15 @@ class GaussianSplatting(Model):
             bg_color=background,
         )
 
-        rgb = torch.permute(torch.clamp(render_results["render"], max=1.), (1, 2, 0))
+        render = render_results["render"]
 
+        # apply appearance transformation
+        if self.appearance is not None:
+            grayscale_factors, gamma = self.appearance
+            render = torch.pow(render, gamma.to(render.device))
+            render = render * grayscale_factors.to(render.device)
+
+        rgb = torch.permute(torch.clamp(render, max=1.), (1, 2, 0))
         return {
             "rgb": rgb,
         }
