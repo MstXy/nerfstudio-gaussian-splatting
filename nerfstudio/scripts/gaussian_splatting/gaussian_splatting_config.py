@@ -25,7 +25,9 @@ class GaussianSplattingConfig:
             ),
         ),
         optimizers={},
-        viewer=ViewerConfig(),
+        viewer=ViewerConfig(
+            max_num_display_images=0,  # camera visualization slower the web viewer, even with 'hide scene/images'
+        ),
         vis="viewer",
     )
 
