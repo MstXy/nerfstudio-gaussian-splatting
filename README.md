@@ -12,7 +12,7 @@ The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/
  * The default orientation may not correct, you can
 	* click `RESET UP DIRECTION` under the "SCENE" tab to use your current viewpoint as the orientation
  	* use `--ref-orientation IMAGE_NAME` option to specific an image as the reference orientation
- * Hold down the right button of your mouse to move the camera a little bit before pressing W/A/S/D, or your camera may be freezed after moving a short distance. (Original nerfstudio also has the same problem)
+ * Hold down the right button of your mouse to move the camera a little bit before pressing W/A/S/D, or your camera may be freezed after moving a short distance. (A fixup has been sumitted: https://github.com/nerfstudio-project/nerfstudio/pull/2404)
  * Press `F5` to refresh the page if the web viewer stops updating the content (not sure why currently, hard to reproduce). If you are creating camera path, click 'EXPORT PATH' to download your camera path before refreshing, and you can click 'LOAD PATH' to restore from the downloaded file later.
 ## Installation
  1. Install nerfstudio dependencies
