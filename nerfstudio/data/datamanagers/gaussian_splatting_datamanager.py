@@ -24,11 +24,11 @@ class GaussianSplattingDatamanager(DataManager):
 
     def __init__(self, model_path: str, orientation_transform):
         super().__init__()
-
+        self.datapath = Path(model_path)
         self.train_dataset = GaussianSplattingDataset(model_path, orientation_transform)
 
     def get_datapath(self) -> Optional[Path]:
-        return Path("/tmp")
+        return self.datapath
 
     def forward(self):
         pass
