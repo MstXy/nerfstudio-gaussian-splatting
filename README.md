@@ -14,7 +14,7 @@ The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/
  	* use `--ref-orientation IMAGE_NAME` option to specific an image as the reference orientation
  * Hold down the right button of your mouse to move the camera a little bit before pressing `W`, or your camera may be frozen after moving a short distance.
    * A fixup has been submitted: https://github.com/nerfstudio-project/nerfstudio/pull/2404
-   * Or use this viewer: http://nsv.cslab.pro/23-09-08-1/?websocket_url=ws://localhost:7007
+   * Or use this viewer: https://nsv.cslab.pro/23-09-08-1/?websocket_url=ws://localhost:7007
  * Press `F5` to refresh the page if the web viewer stops updating the content (not sure why currently, hard to reproduce). If you are creating camera path, click 'EXPORT PATH' to download your camera path before refreshing, and you can click 'LOAD PATH' to restore from the downloaded file later.
 ## Installation
  1. Install nerfstudio dependencies
