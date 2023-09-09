@@ -32,7 +32,6 @@ class GaussianSplattingDataset(InputDataset):
 
         if orientation_transform is not None:
             orientation_transform = orientation_transform.cpu().numpy()
-            orientation_transform = np.linalg.inv(orientation_transform)
 
         # load camera data
         with open(os.path.join(model_path, "cameras.json"), "r") as f:

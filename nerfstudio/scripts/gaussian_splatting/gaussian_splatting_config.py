@@ -35,7 +35,11 @@ class GaussianSplattingConfig:
 
     load_iteration: int = -1
 
+    auto_reorient: bool = True
+    "auto reorient the scene"
+
     ref_orientation: str = None
+    "use specific image as the reference orientation"
 
     appearance_name: str = None
 
@@ -45,6 +49,7 @@ class GaussianSplattingConfig:
         return {
             "model_path": str(self.model_path),
             "load_iteration": self.load_iteration,
+            "auto_reorient": self.auto_reorient,
             "ref_orientation": self.ref_orientation,
             "appearance_name": self.appearance_name,
             "appearance_values": self.appearance_values,

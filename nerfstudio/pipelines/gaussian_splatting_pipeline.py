@@ -48,16 +48,25 @@ class GaussianSplattingPipeline(Pipeline):
             self,
             config: VanillaPipelineConfig,
             device: str,
+            auto_reorient,
             ref_orientation,
             **kwargs,
     ):
         super().__init__()
         self.model_path = kwargs["model_path"]
-        self.ref_orientation = ref_orientation
-        orientation_transform = self.get_orientation_transform()
-        kwargs["orientation_transform"] = orientation_transform
 
-        self.datamanager = GaussianSplattingDatamanager(kwargs["model_path"], orientation_transform)
+        orientation_transform = None
+        camera_pose_transform = None
+        # get orientation transform matrix
+        if ref_orientation is not None:
+            orientation_transform = self.get_orientation_transform_from_image(ref_orientation)
+            camera_pose_transform = torch.linalg.inv(orientation_transform)
+        elif auto_reorient is True:
+            camera_pose_transform = self.get_orientation_transform_by_up()
+            orientation_transform = torch.linalg.inv(camera_pose_transform)
+
+        kwargs["orientation_transform"] = orientation_transform
+        self.datamanager = GaussianSplattingDatamanager(kwargs["model_path"], camera_pose_transform)
         self._model = config.model.setup(
             scene_box=self.datamanager.train_dataset.scene_box,
             num_train_data=len(self.datamanager.train_dataset),
@@ -74,26 +83,23 @@ class GaussianSplattingPipeline(Pipeline):
     def get_param_groups(self):
         return {}
 
-    def get_orientation_transform(self):
-        if self.ref_orientation is None:
-            return None
-
+    def get_orientation_transform_from_image(self, ref_orientation: str):
         # load camera information
         cameras_json_path = os.path.join(self.model_path, "cameras.json")
         if os.path.exists(cameras_json_path) is False:
-            return None
+            raise RuntimeError("{} not exists".format(cameras_json_path))
         with open(cameras_json_path, "r") as f:
             cameras = json.load(f)
 
         # find specific camera by image name
         ref_camera = None
         for i in cameras:
-            if i["img_name"] != self.ref_orientation:
+            if i["img_name"] != ref_orientation:
                 continue
             ref_camera = i
             break
         if ref_camera is None:
-            raise ValueError("camera {} not found".format(self.ref_orientation))
+            raise ValueError("camera {} not found".format(ref_orientation))
 
         def rx(theta):
             return np.matrix([
@@ -111,3 +117,38 @@ class GaussianSplattingPipeline(Pipeline):
         transform = np.matmul(rotation, rx(-np.pi / 2))
 
         return torch.tensor(transform, dtype=torch.float)
+
+    def get_orientation_transform_by_up(self):
+        cameras_json_path = os.path.join(self.model_path, "cameras.json")
+        if os.path.exists(cameras_json_path) is False:
+            raise RuntimeError("{} not exists".format(cameras_json_path))
+        with open(cameras_json_path, "r") as f:
+            cameras = json.load(f)
+
+        up = np.zeros(3)
+        for i in cameras:
+            pose = np.eye(4)
+            pose[:3, :3] = np.asarray(i["rotation"])
+            pose[:3, 3] = np.asarray(i["position"])
+            pose[:3, 1:3] *= -1  # flip the y and z axis
+
+            up += pose[0:3, 1]
+
+        up = up / np.linalg.norm(up)
+        R = GaussianSplattingPipeline.rotmat(up, [0, 0, 1])  # rotate up vector to [0,0,1]
+        R = np.pad(R, [0, 1])
+        R[-1, -1] = 1
+
+        return torch.tensor(R, dtype=torch.float)
+
+    @staticmethod
+    def rotmat(a, b):
+        a, b = a / np.linalg.norm(a), b / np.linalg.norm(b)
+        v = np.cross(a, b)
+        c = np.dot(a, b)
+        # handle exception for the opposite direction input
+        if c < -1 + 1e-10:
+            return GaussianSplattingPipeline.rotmat(a + np.random.uniform(-1e-2, 1e-2, 3), b)
+        s = np.linalg.norm(v)
+        kmat = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+        return np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2 + 1e-10))
