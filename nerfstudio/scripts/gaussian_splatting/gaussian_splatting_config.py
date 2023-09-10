@@ -41,18 +41,12 @@ class GaussianSplattingConfig:
     ref_orientation: str = None
     "use specific image as the reference orientation"
 
-    appearance_name: str = None
-
-    appearance_values: Tuple[float, float, float, float] = (-1., -1., -1., -1.)
-
     def get_pipeline_setup_arguments(self):
         return {
             "model_path": str(self.model_path),
             "load_iteration": self.load_iteration,
             "auto_reorient": self.auto_reorient,
             "ref_orientation": self.ref_orientation,
-            "appearance_name": self.appearance_name,
-            "appearance_values": self.appearance_values,
         }
 
     def setup_pipeline(self):
