@@ -43,8 +43,8 @@ export default function WebSocketUrlField() {
         error={testWebSocket(websocket_url)}
         helperText={testWebSocket(websocket_url) ? 'Invalid websocket URL' : ''}
       />
-      <Link href={`/?websocket_url=${websocket_url}`}>
-        {currentHost}?websocket_url={websocket_url}
+      <Link href={`${window.location.pathname}?websocket_url=${websocket_url}`}>
+        {currentHost}{window.location.pathname}?websocket_url={websocket_url}
       </Link>
     </div>
   );
