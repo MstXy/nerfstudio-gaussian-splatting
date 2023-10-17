@@ -52,8 +52,8 @@ class GaussianSplattingDataset(InputDataset):
         for i in camera_data:
             shape = (i["height"], i["width"])
 
-            if shape not in image_key_by_shape:
-                image_key_by_shape[shape] = torch.ones(i["height"], i["width"], 3, dtype=torch.float)
+            # if shape not in image_key_by_shape:
+            #     image_key_by_shape[shape] = torch.ones(i["height"], i["width"], 3, dtype=torch.float)
 
             image_shapes.append(shape)
 
@@ -85,7 +85,7 @@ class GaussianSplattingDataset(InputDataset):
             )
         )
 
-        self.image_key_by_shape = image_key_by_shape
+        # self.image_key_by_shape = image_key_by_shape
         self.image_shapes = image_shapes
         self.filenames = filenames
         self.cameras = Cameras(
@@ -108,15 +108,15 @@ class GaussianSplattingDataset(InputDataset):
         return data
 
     def get_numpy_image(self, image_idx: int) -> npt.NDArray[np.uint8]:
-        return self.image_key_by_shape[self.image_shapes[image_idx]].cpu().numpy()
+        return np.ones(list(self.image_shapes[image_idx]) + [3], dtype=np.uint8) * 255
 
     def get_image(self, image_idx: int):
-        return self.image_key_by_shape[self.image_shapes[image_idx]]
+        return torch.ones(list(self.image_shapes[image_idx]) + [3], dtype=torch.float)
 
     def get_data(self, image_idx: int) -> Dict:
         return {
             "image_idx": image_idx,
-            "image": self.image_key_by_shape[self.image_shapes[image_idx]],
+            "image": self.get_image(image_idx),
         }
 
     def get_metadata(self, data: Dict) -> Dict:
