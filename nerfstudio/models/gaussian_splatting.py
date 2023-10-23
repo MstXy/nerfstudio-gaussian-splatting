@@ -11,6 +11,7 @@ from torch.nn import Parameter
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.scene_box import SceneBox
 from nerfstudio.models.base_model import Model, ModelConfig
+from nerfstudio.viewer.server.viewer_elements import *
 from nerfstudio.fields.gaussian_splatting_field import GaussianSplattingField
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from nerfstudio.utils.gaussian_splatting_sh_utils import eval_sh
@@ -65,6 +66,8 @@ class GaussianSplatting(Model):
 
         super().__init__(config, scene_box, num_train_data)
 
+        self.scaling_modifier_slider = ViewerSlider(name="Scaling Modifier", default_value=1.0, min_value=0.0, max_value=1.0)
+
     def populate_modules(self):
         super().populate_modules()
 
@@ -97,6 +100,7 @@ class GaussianSplatting(Model):
             pc=self.gaussian_model,
             pipe=self.pipeline_params,
             bg_color=background,
+            scaling_modifier=self.scaling_modifier_slider.value,
         )
 
         render = render_results["render"]
