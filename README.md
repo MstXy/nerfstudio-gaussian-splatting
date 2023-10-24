@@ -3,6 +3,7 @@ The codes originated from NeRFStudio are licensed under the Apache-2.0 license.
 
 The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) ([License](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/main/LICENSE.md)), [submodules/simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn.git), some codes and files copied from [graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) ([License](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/LICENSE.md)) that used to implement gaussian splatting here are separately licensed.
 
+
 # Gaussian Splatting Viewer & Render
 ## NOTE
  * Not well tested, rendering only (no training), not as fast as SIBR viewers
@@ -38,6 +39,11 @@ python nerfstudio/scripts/gaussian_splatting/render.py camera-path \
     --camera-path-filename YOUR_CAMERA_PATH_FILE.json \
     --output-path YOUR_OUTPUT_MP4_FILE.mp4
 ```
+
+## New Implementation with Web Viewer
+A new implementation with web viewer: [yzslab/gaussian-splatting-lightning](https://github.com/yzslab/gaussian-splatting-lightning)
+
+The new one has more training features. But render video hasn't been supported yet.
 
 <hr>
 <p align="center">
