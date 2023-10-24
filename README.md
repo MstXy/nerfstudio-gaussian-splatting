@@ -11,6 +11,7 @@ The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/
  	* increase the render resolution (the `Max Res` option under the `CONTROLS` tab)
   	* increase jpeg quality (`--config.viewer.jpeg-quality 100`) or switch to png format (`--config.viewer.image-format png`)
  * The default orientation may not correct, you can
+	* add `--no-auto-reorient` option to `run_viewer.py` or `render.py` if you want the viewer use the same coordination system as the input dataset
 	* click `RESET UP DIRECTION` under the "SCENE" tab to use your current viewpoint as the orientation
  	* use `--ref-orientation IMAGE_NAME` option to specific an image as the reference orientation
  * Hold down the right button of your mouse to move the camera a little bit before pressing `W`, or your camera may be frozen after moving a short distance.
