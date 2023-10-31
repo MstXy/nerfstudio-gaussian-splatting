@@ -6,7 +6,9 @@ The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/
 # [10-25] New Web Viewer
 A new implementation with web viewer: [yzslab/gaussian-splatting-lightning](https://github.com/yzslab/gaussian-splatting-lightning)
 
-The new one doesn't require NeRFStudio, and has more training features. But render video hasn't been supported yet.
+<video width="50%" src="https://github.com/yzslab/gaussian-splatting-lightning/assets/564361/b0c1478c-31fc-498c-a7b2-9a2440598916"></video>
+
+The new one doesn't require NeRFStudio, and has more features. But render video hasn't been supported yet.
 
 # Gaussian Splatting Viewer & Render
 ## NOTE
