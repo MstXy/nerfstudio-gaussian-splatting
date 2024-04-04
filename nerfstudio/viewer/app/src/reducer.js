@@ -37,7 +37,7 @@ const initialState = {
     // camera path information
     render_height: 1080,
     render_width: 1920,
-    field_of_view: 50,
+    field_of_view: 80, // change to 80
     camera_type: 'perspective',
 
     training_state: 'training',

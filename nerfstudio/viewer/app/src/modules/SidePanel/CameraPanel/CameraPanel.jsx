@@ -558,7 +558,7 @@ export default function CameraPanel(props) {
   const viser_websocket = useContext(ViserWebSocketContext);
   const throttled_time_message_sender =
     makeThrottledMessageSender(viser_websocket);
-  const DEFAULT_FOV = 50;
+  const DEFAULT_FOV = 80; // change to 80
   const DEFAULT_RENDER_TIME = 0.0;
 
   // react state

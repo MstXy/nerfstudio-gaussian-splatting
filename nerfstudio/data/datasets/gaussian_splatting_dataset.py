@@ -30,51 +30,51 @@ class GaussianSplattingDataset(InputDataset):
     def __init__(self, model_path: str, orientation_transform):
         Dataset().__init__()
 
-        if orientation_transform is not None:
-            orientation_transform = orientation_transform.cpu().numpy()
+        # if orientation_transform is not None:
+        #     orientation_transform = orientation_transform.cpu().numpy()
 
-        # load camera data
-        with open(os.path.join(model_path, "cameras.json"), "r") as f:
-            camera_data = json.load(f)
+        # # load camera data
+        # with open(os.path.join(model_path, "cameras.json"), "r") as f:
+        #     camera_data = json.load(f)
 
-        image_key_by_shape = {}
-        image_shapes = []
-        filenames = []
+        # image_key_by_shape = {}
+        # image_shapes = []
+        # filenames = []
 
-        fx_list = []
-        fy_list = []
-        cx_list = []
-        cy_list = []
-        height_list = []
-        width_list = []
-        c2w_list = []
+        # fx_list = []
+        # fy_list = []
+        # cx_list = []
+        # cy_list = []
+        # height_list = []
+        # width_list = []
+        # c2w_list = []
 
-        for i in camera_data:
-            shape = (i["height"], i["width"])
+        # for i in camera_data:
+        #     shape = (i["height"], i["width"])
 
-            # if shape not in image_key_by_shape:
-            #     image_key_by_shape[shape] = torch.ones(i["height"], i["width"], 3, dtype=torch.float)
+        #     # if shape not in image_key_by_shape:
+        #     #     image_key_by_shape[shape] = torch.ones(i["height"], i["width"], 3, dtype=torch.float)
 
-            image_shapes.append(shape)
+        #     image_shapes.append(shape)
 
-            fx_list.append(i["fx"])
-            fy_list.append(i["fy"])
-            cx_list.append(i["width"] / 2)
-            cy_list.append(i["height"] / 2)
-            height_list.append(i["height"])
-            width_list.append(i["width"])
+        #     fx_list.append(i["fx"])
+        #     fy_list.append(i["fy"])
+        #     cx_list.append(i["width"] / 2)
+        #     cy_list.append(i["height"] / 2)
+        #     height_list.append(i["height"])
+        #     width_list.append(i["width"])
 
-            c2w = np.eye(4)
-            c2w[:3, :3] = np.asarray(i["rotation"])
-            c2w[:3, 3] = np.asarray(i["position"])
-            c2w[:3, 1:3] *= -1
+        #     c2w = np.eye(4)
+        #     c2w[:3, :3] = np.asarray(i["rotation"])
+        #     c2w[:3, 3] = np.asarray(i["position"])
+        #     c2w[:3, 1:3] *= -1
 
-            if orientation_transform is not None:
-                c2w = np.matmul(orientation_transform, c2w)
+        #     if orientation_transform is not None:
+        #         c2w = np.matmul(orientation_transform, c2w)
 
-            c2w_list.append(c2w[:3, ...])
+        #     c2w_list.append(c2w[:3, ...])
 
-            filenames.append(i["img_name"])
+        #     filenames.append(i["img_name"])
 
         self.metadata = {}
 
@@ -85,24 +85,25 @@ class GaussianSplattingDataset(InputDataset):
             )
         )
 
-        # self.image_key_by_shape = image_key_by_shape
-        self.image_shapes = image_shapes
-        self.filenames = filenames
-        self.cameras = Cameras(
-            fx=torch.tensor(fx_list, dtype=torch.float),
-            fy=torch.tensor(fy_list, dtype=torch.float),
-            cx=torch.tensor(cx_list, dtype=torch.float),
-            cy=torch.tensor(cy_list, dtype=torch.float),
-            distortion_params=None,
-            height=torch.tensor(height_list, dtype=torch.int),
-            width=torch.tensor(width_list, dtype=torch.int),
-            camera_to_worlds=torch.from_numpy(np.stack(c2w_list, axis=0)),
-            camera_type=CameraType.PERSPECTIVE,
-        )
+        # # self.image_key_by_shape = image_key_by_shape
+        # self.image_shapes = image_shapes
+        # self.filenames = filenames
+        # self.cameras = Cameras(
+        #     fx=torch.tensor(fx_list, dtype=torch.float),
+        #     fy=torch.tensor(fy_list, dtype=torch.float),
+        #     cx=torch.tensor(cx_list, dtype=torch.float),
+        #     cy=torch.tensor(cy_list, dtype=torch.float),
+        #     distortion_params=None,
+        #     height=torch.tensor(height_list, dtype=torch.int),
+        #     width=torch.tensor(width_list, dtype=torch.int),
+        #     camera_to_worlds=torch.from_numpy(np.stack(c2w_list, axis=0)),
+        #     camera_type=CameraType.PERSPECTIVE,
+        # )
 
     def __len__(self):
-        return len(self.filenames)
+        return 10000 # len(self.filenames)
 
+    # not used ------------------
     def __getitem__(self, image_idx: int) -> Dict:
         data = self.get_data(image_idx)
         return data
@@ -121,6 +122,7 @@ class GaussianSplattingDataset(InputDataset):
 
     def get_metadata(self, data: Dict) -> Dict:
         return {}
+    # not used ------------------
 
     @property
     def image_filenames(self) -> List[Path]:

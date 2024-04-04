@@ -251,7 +251,7 @@ export default function ViewerWindow(props) {
     const fov = Math.atan(1 / fl_new) / (Math.PI / 360);
     sceneTree.metadata.camera.fov = fov;
   } else {
-    sceneTree.metadata.camera.fov = 50;
+    sceneTree.metadata.camera.fov = 80; // change to 80
   }
 
   let old_camera_matrix = null;

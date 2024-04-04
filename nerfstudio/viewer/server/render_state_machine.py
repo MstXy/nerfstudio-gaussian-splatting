@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, Tuple, get_args
 
 import torch
+import numpy as np
 
 from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.model_components.renderers import background_color_override_context
@@ -127,6 +128,18 @@ class RenderStateMachine(threading.Thread):
         assert camera is not None, "render called before viewer connected"
 
         with self.viewer.train_lock if self.viewer.train_lock is not None else contextlib.nullcontext():
+            # TEST:
+            # print("x: {}, y: {}, z: {}".format(camera.camera_to_worlds[0][0][-1], 
+            #                                    camera.camera_to_worlds[0][1][-1], 
+            #                                    camera.camera_to_worlds[0][2][-1])) # z is the up-down direction
+            
+            # get viewer camera position and then check which block to load.
+            x = camera.camera_to_worlds[0][0][-1]
+            y = camera.camera_to_worlds[0][1][-1]
+            z = camera.camera_to_worlds[0][2][-1]
+            cam_point = torch.tensor([x, -z, y]).to(device=x.device)
+            self.viewer.get_model().check_block(camera_position=cam_point)
+
             camera_ray_bundle = camera.generate_rays(camera_indices=0, aabb_box=self.viewer.get_model().render_aabb)
 
             with TimeWriter(None, None, write=False) as vis_t:

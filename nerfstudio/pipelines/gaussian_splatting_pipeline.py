@@ -85,7 +85,7 @@ class GaussianSplattingPipeline(Pipeline):
 
     def get_orientation_transform_from_image(self, ref_orientation: str):
         # load camera information
-        cameras_json_path = os.path.join(self.model_path, "cameras.json")
+        cameras_json_path = os.path.join(self.model_path, "block_0/cameras.json")
         if os.path.exists(cameras_json_path) is False:
             raise RuntimeError("{} not exists".format(cameras_json_path))
         with open(cameras_json_path, "r") as f:
@@ -119,25 +119,32 @@ class GaussianSplattingPipeline(Pipeline):
         return torch.tensor(transform, dtype=torch.float)
 
     def get_orientation_transform_by_up(self):
-        cameras_json_path = os.path.join(self.model_path, "cameras.json")
-        if os.path.exists(cameras_json_path) is False:
-            raise RuntimeError("{} not exists".format(cameras_json_path))
-        with open(cameras_json_path, "r") as f:
-            cameras = json.load(f)
+        # cameras_json_path = os.path.join(self.model_path, "block_0/cameras.json")
+        # if os.path.exists(cameras_json_path) is False:
+        #     raise RuntimeError("{} not exists".format(cameras_json_path))
+        # with open(cameras_json_path, "r") as f:
+        #     cameras = json.load(f)
 
-        up = np.zeros(3)
-        for i in cameras:
-            pose = np.eye(4)
-            pose[:3, :3] = np.asarray(i["rotation"])
-            pose[:3, 3] = np.asarray(i["position"])
-            pose[:3, 1:3] *= -1  # flip the y and z axis
+        # up = np.zeros(3)
+        # for i in cameras:
+        #     pose = np.eye(4)
+        #     pose[:3, :3] = np.asarray(i["rotation"])
+        #     pose[:3, 3] = np.asarray(i["position"])
+        #     pose[:3, 1:3] *= -1  # flip the y and z axis
 
-            up += pose[0:3, 1]
+        #     up += pose[0:3, 1]
 
-        up = up / np.linalg.norm(up)
-        R = GaussianSplattingPipeline.rotmat(up, [0, 0, 1])  # rotate up vector to [0,0,1]
-        R = np.pad(R, [0, 1])
-        R[-1, -1] = 1
+        # up = up / np.linalg.norm(up)
+        # R = GaussianSplattingPipeline.rotmat(up, [0, 0, 1])  # rotate up vector to [0,0,1]
+        # R = np.pad(R, [0, 1])
+        # R[-1, -1] = 1
+
+        # we already normalized the R & T
+        R = np.zeros((4,4))
+        R[0, 0] = 1
+        R[1, 2] = 1
+        R[2, 1] = -1
+        R[3, 3] = 1
 
         return torch.tensor(R, dtype=torch.float)
 

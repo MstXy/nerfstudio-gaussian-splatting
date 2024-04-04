@@ -17,7 +17,7 @@ class GaussianSplattingConfig:
         steps_per_eval_batch=999999999,
         steps_per_save=999999999,
         max_num_iterations=999999999,
-        mixed_precision=True,
+        mixed_precision=False,
         pipeline=GaussianSplattingPipelineConfig(
             datamanager=GaussianSplattingDatamanagerConfig(),
             model=GaussianSplattingModelConfig(

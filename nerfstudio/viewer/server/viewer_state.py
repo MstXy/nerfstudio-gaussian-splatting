@@ -168,13 +168,16 @@ class ViewerState:
             ]
         else:
             self.viewer_controls: List[ViewerControl] = [
-                e for (_, e) in parse_object(self.trainer, ViewerControl, "Pipeline")
+                e for (_, e) in parse_object(self.pipeline, ViewerControl, "Pipeline")
             ]
 
         for c in self.viewer_controls:
             c._setup(self)
         self.render_statemachine = RenderStateMachine(self)
         self.render_statemachine.start()
+
+        # initialize fov
+        self.get_model().viewer_control.set_fov(80)
 
     def _output_type_change(self, _):
         self.output_type_changed = True

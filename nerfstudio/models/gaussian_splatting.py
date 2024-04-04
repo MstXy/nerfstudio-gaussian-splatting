@@ -18,6 +18,7 @@ from nerfstudio.utils.gaussian_splatting_sh_utils import eval_sh
 from nerfstudio.cameras.gaussian_splatting_camera import Camera as GaussianSplattingCamera
 from nerfstudio.utils.gaussian_splatting_graphics_utils import getWorld2View2, focal2fov, fov2focal
 
+import pdb
 
 @dataclass
 class GaussianSplattingModelConfig(ModelConfig):
@@ -63,26 +64,100 @@ class GaussianSplatting(Model):
             self.bg_color = [0, 0, 0]
         else:
             self.bg_color = [1, 1, 1]
+        self.current_block = None
+        self.block_info = None
 
         super().__init__(config, scene_box, num_train_data)
 
         self.scaling_modifier_slider = ViewerSlider(name="Scaling Modifier", default_value=1.0, min_value=0.0, max_value=1.0)
 
+        # set FOV: fixed bug in nerfstudio/viewer/server/viewer_state.py:L171
+        self.viewer_control = ViewerControl()  
+        ## use a slider to control
+        def change_fov(slider):
+            self.viewer_control.set_fov(slider.value)
+        self.viewer_slider = ViewerSlider(name="Viewer FOV", default_value=80, min_value=20, max_value=120, step=1, cb_hook=change_fov)
+        
+        ## For test: 
+        def on_change_callback(handle: ViewerCheckbox) -> None:
+            print(handle.value)
+            self.load_block(block_idx=1 if not handle.value else 0)
+
+        self.custom_checkbox = ViewerCheckbox(
+            name="Change Scene",
+            default_value=False,
+            cb_hook=on_change_callback,
+        )
+        
+        # # get width & height, fx & fy from model_path
+        # with open(os.path.join(self.model_path, "cameras.json"), "r") as f:
+        #     camera_data = json.load(f)
+        # self._gs_height = camera_data[0]["height"]
+        # self._gs_width = camera_data[0]["width"]
+        # self._gs_fx = camera_data[0]["fx"]
+        # self._gs_fy = camera_data[0]["fy"]
+
     def populate_modules(self):
         super().populate_modules()
 
-        # get iteration
-        if self.load_iteration == -1:
-            self.load_iteration = self.search_for_max_iteration(os.path.join(self.model_path, "point_cloud"))
-        print("Loading trained model at iteration {}".format(self.load_iteration))
-
-        # load gaussian model
+        # initialize gaussian model
         self.gaussian_model = GaussianSplattingField(sh_degree=self.config.sh_degree)
 
-        self.gaussian_model.load_ply(os.path.join(self.model_path,
+        # TODO: add param here.
+        self.get_block_info()
+        self.load_block(block_idx=0)
+    
+    def get_block_info(self):
+        with open(os.path.join(self.model_path, "blocks.json"), 'r') as f:
+            self.block_info = json.load(f)
+
+    def load_block(self, block_idx: int):
+        if block_idx == self.current_block:
+            return 
+        self.current_block = block_idx
+        print("Loading block {}".format(block_idx))
+        block_path = os.path.join(self.model_path, "block_{}".format(block_idx))
+        # get iteration
+        if self.load_iteration == -1:
+            self.load_iteration = self.search_for_max_iteration(os.path.join(block_path, "point_cloud"))
+        print("Loading trained model at iteration {}".format(self.load_iteration))
+
+        # load block
+        self.gaussian_model.load_ply(path=os.path.join(block_path,
                                                   "point_cloud",
                                                   "iteration_" + str(self.load_iteration),
                                                   "point_cloud.ply"))
+
+    def check_block(self, camera_position: torch.Tensor):
+        device = camera_position.device
+        total_blocks = len(self.block_info)
+        eps = 0.5
+
+        this_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block)]["center"], device=device)
+        # check if current camera position is close to the left boundary
+        left_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block)]["anchor"], device=device)
+        left_plane_normal = torch.nn.functional.normalize(left_anchor - this_centroid, dim=0)
+        if not self.current_block == 0 and torch.linalg.norm(torch.dot(left_anchor - camera_position, left_plane_normal)) < eps:
+            # now check if crossed the left boundary
+            prev_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block - 1)]["center"], device=device)
+            prev_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, prev_centroid - left_anchor, dim=0)
+            this_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, this_centroid - left_anchor, dim=0)
+            if prev_dist > this_dist:
+                self.load_block(self.current_block - 1)
+                return
+            
+        # check if current camera position is close to the right boundary
+        if not self.current_block == total_blocks - 1:
+            right_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["anchor"], device=device)
+            right_plane_normal = torch.nn.functional.normalize(right_anchor - this_centroid, dim=0)
+            if torch.linalg.norm(torch.dot(right_anchor - camera_position, right_plane_normal)):
+                # now check if crossed the left boundary
+                next_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["center"], device=device)
+                this_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, this_centroid - right_anchor, dim=0)
+                next_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, next_centroid - right_anchor, dim=0)
+                if next_dist > this_dist:
+                    self.load_block(self.current_block + 1)
+                    return
 
     @staticmethod
     def search_for_max_iteration(folder):
@@ -91,6 +166,11 @@ class GaussianSplatting(Model):
 
     @torch.no_grad()
     def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
+        # pdb.set_trace() 
+        ## function called after opening up viewer (in localhost) 
+        ## in viewer/server/render_state_machine.py(148)_render_img()
+        ## -> outputs = self.viewer.get_model().get_outputs_for_camera_ray_bundle(camera_ray_bundle)
+
         viewpoint_camera = self.ns2gs_camera(camera_ray_bundle.camera)
 
         background = torch.tensor(self.bg_color, dtype=torch.float32, device=camera_ray_bundle.origins.device)
@@ -128,6 +208,9 @@ class GaussianSplatting(Model):
 
         FovY = focal2fov(ns_camera.fy, ns_camera.height)
         FovX = focal2fov(ns_camera.fx, ns_camera.width)
+
+        # FovY = focal2fov(self._gs_fy, ns_camera.height)
+        # FovX = focal2fov(self._gs_fx, ns_camera.height)
 
         return GaussianSplattingCamera(
             R=R,
