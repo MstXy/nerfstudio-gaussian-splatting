@@ -134,6 +134,13 @@ def _render_trajectory_video(
                     bounding_box_min = crop_data.center - crop_data.scale / 2.0
                     bounding_box_max = crop_data.center + crop_data.scale / 2.0
                     aabb_box = SceneBox(torch.stack([bounding_box_min, bounding_box_max]).to(pipeline.device))
+                
+                x = cameras.camera_to_worlds[camera_idx][0][-1]
+                y = cameras.camera_to_worlds[camera_idx][1][-1]
+                z = cameras.camera_to_worlds[camera_idx][2][-1]
+                cam_point = torch.tensor([x, -z, y]).to(device=x.device)
+                pipeline.model.check_block(camera_position=cam_point)
+                
                 camera_ray_bundle = cameras.generate_rays(camera_indices=camera_idx, aabb_box=aabb_box)
 
                 if crop_data is not None:
