@@ -3,10 +3,9 @@ import json
 import numpy as np
 import torch
 import math
-import torchvision
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Tuple, Type
-from torch.nn import Parameter
 
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.scene_box import SceneBox
@@ -18,7 +17,9 @@ from nerfstudio.utils.gaussian_splatting_sh_utils import eval_sh
 from nerfstudio.cameras.gaussian_splatting_camera import Camera as GaussianSplattingCamera
 from nerfstudio.utils.gaussian_splatting_graphics_utils import getWorld2View2, focal2fov, fov2focal
 
-import pdb
+from scipy import interpolate, optimize
+
+# import pdb
 
 @dataclass
 class GaussianSplattingModelConfig(ModelConfig):
@@ -41,6 +42,7 @@ class PipelineParams():
 class GaussianSplatting(Model):
     config: GaussianSplattingModelConfig
     model_path: str
+    complex: str
     load_iteration: int
     ref_orientation: str
     orientation_transform: torch.Tensor
@@ -52,11 +54,14 @@ class GaussianSplatting(Model):
             scene_box: SceneBox,
             num_train_data: int,
             model_path: str = None,
+            complex: str = "False",
             load_iteration: int = -1,
             orientation_transform: torch.Tensor = None,
     ) -> None:
         self.config = config
         self.model_path = model_path
+        self.complex_trajectory = (complex == "True")
+        print("Complex Trajectory: {}".format(self.complex_trajectory))
         self.load_iteration = load_iteration
         self.orientation_transform = orientation_transform
         self.pipeline_params = PipelineParams()
@@ -66,6 +71,10 @@ class GaussianSplatting(Model):
             self.bg_color = [1, 1, 1]
         self.current_block = None
         self.block_info = None
+        if self.complex_trajectory:
+            self.next_block = None
+            self.spl_tmp = None
+            self.spl_computing = False
 
         super().__init__(config, scene_box, num_train_data)
 
@@ -110,6 +119,13 @@ class GaussianSplatting(Model):
     def get_block_info(self):
         with open(os.path.join(self.model_path, "blocks.json"), 'r') as f:
             self.block_info = json.load(f)
+            self.total_blocks = len(self.block_info)
+            print("Total blocks: {}".format(self.total_blocks))
+        if self.complex_trajectory:
+            self.tcks = []
+            for i in range(self.total_blocks):
+                tck = [np.array(self.block_info["block_"+str(i)]["t"]), np.array(self.block_info["block_"+str(i)]["c"]), self.block_info["block_"+str(i)]["k"]]
+                self.tcks.append(tck)
 
     def load_block(self, block_idx: int):
         if block_idx == self.current_block:
@@ -130,34 +146,86 @@ class GaussianSplatting(Model):
 
     def check_block(self, camera_position: torch.Tensor):
         device = camera_position.device
-        total_blocks = len(self.block_info)
-        eps = 0.5
-
-        this_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block)]["center"], device=device)
-        # check if current camera position is close to the left boundary
-        left_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block)]["anchor"], device=device)
-        left_plane_normal = torch.nn.functional.normalize(left_anchor - this_centroid, dim=0)
-        if not self.current_block == 0 and torch.linalg.norm(torch.dot(left_anchor - camera_position, left_plane_normal)) < eps:
-            # now check if crossed the left boundary
-            prev_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block - 1)]["center"], device=device)
-            prev_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, prev_centroid - left_anchor, dim=0)
-            this_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, this_centroid - left_anchor, dim=0)
-            if prev_dist > this_dist:
-                self.load_block(self.current_block - 1)
-                return
-            
-        # check if current camera position is close to the right boundary
-        if not self.current_block == total_blocks - 1:
-            right_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["anchor"], device=device)
-            right_plane_normal = torch.nn.functional.normalize(right_anchor - this_centroid, dim=0)
-            if torch.linalg.norm(torch.dot(right_anchor - camera_position, right_plane_normal)):
+        
+        if not self.complex_trajectory: # simple straight trajectory
+            eps = 0.5
+            this_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block)]["center"], device=device)
+            # check if current camera position is close to the left boundary
+            left_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block)]["anchor"], device=device)
+            left_plane_normal = torch.nn.functional.normalize(left_anchor - this_centroid, dim=0)
+            if not self.current_block == 0 and torch.linalg.norm(torch.dot(left_anchor - camera_position, left_plane_normal)) < eps:
                 # now check if crossed the left boundary
-                next_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["center"], device=device)
-                this_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, this_centroid - right_anchor, dim=0)
-                next_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, next_centroid - right_anchor, dim=0)
-                if next_dist > this_dist:
-                    self.load_block(self.current_block + 1)
+                prev_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block - 1)]["center"], device=device)
+                prev_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, prev_centroid - left_anchor, dim=0)
+                this_dist = torch.nn.functional.cosine_similarity(camera_position - left_anchor, this_centroid - left_anchor, dim=0)
+                if prev_dist > this_dist:
+                    self.load_block(self.current_block - 1)
                     return
+                
+            # check if current camera position is close to the right boundary
+            if not self.current_block == self.total_blocks - 1:
+                right_anchor = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["anchor"], device=device)
+                right_plane_normal = torch.nn.functional.normalize(right_anchor - this_centroid, dim=0)
+                if torch.linalg.norm(torch.dot(right_anchor - camera_position, right_plane_normal)):
+                    # now check if crossed the left boundary
+                    next_centroid = torch.tensor(self.block_info["block_{}".format(self.current_block + 1)]["center"], device=device)
+                    this_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, this_centroid - right_anchor, dim=0)
+                    next_dist = torch.nn.functional.cosine_similarity(camera_position - right_anchor, next_centroid - right_anchor, dim=0)
+                    if next_dist > this_dist:
+                        self.load_block(self.current_block + 1)
+                        return
+        elif not self.spl_computing: # complex trajectory
+            self.spl_computing = True
+            eps = 0.25
+            camera_position = camera_position.cpu().numpy().reshape(3,1)
+
+            dist_0 = float("inf")
+            dist_2 = float("inf")
+
+            if self.current_block > 0:
+                self.spl_tmp = 0
+                closestu_0_0 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])
+                closestu_0_1 = optimize.minimize(self.distToP, 0.5, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                closestu_0_2 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                # closestu_0_3 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                dist_0 = np.array([closestu_0_0.fun, closestu_0_1.fun, closestu_0_2.fun]).min()
+                
+                # dist_0 = optimize.basinhopping(self.distToP, 0.5, minimizer_kwargs=dict(args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)]), niter=6).fun
+
+            self.spl_tmp = 0
+            closestu_1_0 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block],camera_position), bounds=[(0,1)])
+            closestu_1_1 = optimize.minimize(self.distToP, 0.35, args=(self.tcks[self.current_block],camera_position), bounds=[(0,1)])
+            closestu_1_2 = optimize.minimize(self.distToP, 0.65, args=(self.tcks[self.current_block],camera_position), bounds=[(0,1)])
+            closestu_1_3 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block],camera_position), bounds=[(0,1)])
+            dist_1 = np.array([closestu_1_0.fun, closestu_1_1.fun, closestu_1_2.fun, closestu_1_3.fun]).min()
+
+            # dist_1 = optimize.basinhopping(self.distToP, 0.5, minimizer_kwargs=dict(args=(self.tcks[self.current_block],camera_position), bounds=[(0,1)]), niter=6).fun
+
+            if self.current_block < self.total_blocks - 1:
+                self.spl_tmp = 0
+                closestu_2_0 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])
+                closestu_2_1 = optimize.minimize(self.distToP, 0.5, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
+                closestu_2_2 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
+                # closestu_2_3 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                                
+                dist_2 = np.array([closestu_2_0.fun, closestu_2_1.fun, closestu_2_2.fun]).min()
+
+                # dist_2 = optimize.basinhopping(self.distToP, 0.5, minimizer_kwargs=dict(args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)]), niter=6).fun
+            
+            closest_block = np.array([dist_0 + eps, dist_1, dist_2 + eps]).argmin() - 1 # -1, 0, 1 -> prev, curr, next
+            if closest_block != 0: # need to load new block
+                # but first, check consistency.
+                if closest_block != self.next_block:
+                    self.next_block = closest_block
+                else:
+                    print(camera_position.reshape(3))
+                    self.load_block(self.current_block + closest_block)
+                    self.next_block = None
+            self.spl_computing = False
+
+    def distToP(self, u, tck, cam_point):
+        s = np.array(interpolate.splev(u, tck))
+        self.spl_tmp = s - cam_point
+        return np.linalg.norm(self.spl_tmp)
 
     @staticmethod
     def search_for_max_iteration(folder):

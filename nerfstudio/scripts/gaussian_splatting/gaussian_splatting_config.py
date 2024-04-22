@@ -33,6 +33,8 @@ class GaussianSplattingConfig:
 
     model_path: str = None
 
+    complex: str = "False"
+
     load_iteration: int = -1
 
     auto_reorient: bool = True
@@ -44,6 +46,7 @@ class GaussianSplattingConfig:
     def get_pipeline_setup_arguments(self):
         return {
             "model_path": str(self.model_path),
+            "complex": str(self.complex),
             "load_iteration": self.load_iteration,
             "auto_reorient": self.auto_reorient,
             "ref_orientation": self.ref_orientation,
