@@ -38,15 +38,16 @@ pip install ./submodules/simple-knn
 ## Usage
 ### Viewer: 
 ```bash
-python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model-path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR
+python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model_path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR
 ```
 
 ### Render:
 ```bash
 python nerfstudio/scripts/gaussian_splatting/render.py camera-path \
-    --model-path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR \
-    --camera-path-filename YOUR_CAMERA_PATH_FILE.json \
-    --output-path YOUR_OUTPUT_MP4_FILE.mp4
+    --model_path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR \
+    --complex <True/False> \
+    --camera_path_filename YOUR_CAMERA_PATH_FILE.json \
+    --output_path YOUR_OUTPUT_MP4_FILE.mp4
 ```
 
 <hr>
