@@ -3,14 +3,24 @@ The codes originated from NeRFStudio are licensed under the Apache-2.0 license.
 
 The [submodules/diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) ([License](https://github.com/graphdeco-inria/diff-gaussian-rasterization/blob/main/LICENSE.md)), [submodules/simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn.git), some codes and files copied from [graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) ([License](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/LICENSE.md)) that used to implement gaussian splatting here are separately licensed.
 
-# [10-25] New Web Viewer
-A new implementation with web viewer: [yzslab/gaussian-splatting-lightning](https://github.com/yzslab/gaussian-splatting-lightning)
+### Based on https://github.com/yzslab/nerfstudio/tree/gaussian_splatting
 
-| Transform | Camera Path | Edit |
-| --- | --- | --- |
-| <video src="https://github.com/yzslab/gaussian-splatting-lightning/assets/564361/de1ff3c3-a27a-4600-8c76-ab6551df6fca"></video> | <video src="https://github.com/yzslab/gaussian-splatting-lightning/assets/564361/3f87243d-d9a1-41e2-9d51-225735925db4"></video> | <video src="https://github.com/yzslab/gaussian-splatting-lightning/assets/564361/7cf0ccf2-44e9-4fc9-87cc-740b7bbda488"></video> |
+On-demand block rendering for Scalable Indoor Novel-View Synthesis using Drone-Captured 360 Imagery with 3D Gaussian Splatting.
 
-The new one doesn't require NeRFStudio, and has more features.
+File structure:
+```
+<location>
+|---block_0
+    |---point_cloud
+        |---ITER_NUM
+            |---point_cloud.ply
+|---block_1
+    |---point_cloud
+        |---ITER_NUM
+            |---point_cloud.ply
+|---...
+|---blocks.json
+```
 
 # Gaussian Splatting Viewer & Render
 ## NOTE
@@ -37,8 +47,9 @@ pip install ./submodules/simple-knn
 ```
 ## Usage
 ### Viewer: 
+Set `--complex` to `True` for arbitrary/complex drone trajectories. 
 ```bash
-python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model_path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR
+python nerfstudio/scripts/gaussian_splatting/run_viewer.py --model_path GAUSSIAN_TRAINING_OUTPUT_MODEL_DIR --complex <True/False>
 ```
 
 ### Render:
