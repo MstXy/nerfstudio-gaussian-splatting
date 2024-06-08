@@ -72,7 +72,8 @@ class GaussianSplatting(Model):
         self.current_block = None
         self.block_info = None
         if self.complex_trajectory:
-            self.next_block = None
+            self.next_block_buffer = []
+            self.buffer_length = 8
             self.spl_tmp = None
             self.spl_computing = False
 
@@ -185,10 +186,10 @@ class GaussianSplatting(Model):
             if self.current_block > 0:
                 self.spl_tmp = 0
                 closestu_0_0 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])
-                closestu_0_1 = optimize.minimize(self.distToP, 0.5, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
-                closestu_0_2 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
-                # closestu_0_3 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
-                dist_0 = np.array([closestu_0_0.fun, closestu_0_1.fun, closestu_0_2.fun]).min()
+                closestu_0_1 = optimize.minimize(self.distToP, 0.65, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                closestu_0_2 = optimize.minimize(self.distToP, 0.35, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                closestu_0_3 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)])                
+                dist_0 = np.array([closestu_0_0.fun, closestu_0_1.fun, closestu_0_2.fun, closestu_0_3.fun]).min()
                 
                 # dist_0 = optimize.basinhopping(self.distToP, 0.5, minimizer_kwargs=dict(args=(self.tcks[self.current_block-1],camera_position), bounds=[(0,1)]), niter=6).fun
 
@@ -204,22 +205,29 @@ class GaussianSplatting(Model):
             if self.current_block < self.total_blocks - 1:
                 self.spl_tmp = 0
                 closestu_2_0 = optimize.minimize(self.distToP, 0.05, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])
-                closestu_2_1 = optimize.minimize(self.distToP, 0.5, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
-                closestu_2_2 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
-                # closestu_2_3 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                                
-                dist_2 = np.array([closestu_2_0.fun, closestu_2_1.fun, closestu_2_2.fun]).min()
+                closestu_2_1 = optimize.minimize(self.distToP, 0.35, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
+                closestu_2_2 = optimize.minimize(self.distToP, 0.65, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                
+                closestu_2_3 = optimize.minimize(self.distToP, 0.95, args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)])                                
+                dist_2 = np.array([closestu_2_0.fun, closestu_2_1.fun, closestu_2_2.fun, closestu_2_3.fun]).min()
 
                 # dist_2 = optimize.basinhopping(self.distToP, 0.5, minimizer_kwargs=dict(args=(self.tcks[self.current_block+1],camera_position), bounds=[(0,1)]), niter=6).fun
             
             closest_block = np.array([dist_0 + eps, dist_1, dist_2 + eps]).argmin() - 1 # -1, 0, 1 -> prev, curr, next
             if closest_block != 0: # need to load new block
                 # but first, check consistency.
-                if closest_block != self.next_block:
-                    self.next_block = closest_block
+                ## check if buffer is full:
+                if len(self.next_block_buffer) == self.buffer_length:
+                    # check if buffer contains only one choice:
+                    if len(set(self.next_block_buffer)) == 1 and self.next_block_buffer[0] == closest_block:
+                        ## load block
+                        print(camera_position.reshape(3))
+                        self.load_block(self.current_block + closest_block)
+                        self.next_block_buffer = []
+                    else:
+                        self.next_block_buffer.pop(0)
+                        self.next_block_buffer.append(closest_block)
                 else:
-                    print(camera_position.reshape(3))
-                    self.load_block(self.current_block + closest_block)
-                    self.next_block = None
+                    self.next_block_buffer.append(closest_block)
             self.spl_computing = False
 
     def distToP(self, u, tck, cam_point):
